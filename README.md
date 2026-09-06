@@ -200,11 +200,15 @@ extras are advertised as optional and the adapters must import without them.
 A passing test suite does not prove the *package* is sound. To check what users
 will actually install, build it and exercise the installed copy:
 
+```powershell
+.\scripts\clean_room_test.ps1     # Windows: build, check, install, exercise
+```
+
 ```bash
-python -m build
-python -m twine check dist/*
+# any platform, by hand
+python -m build && python -m twine check dist/*
 python -m venv /tmp/clean && /tmp/clean/bin/python -m pip install dist/*.whl
-cd /tmp && /tmp/clean/bin/python path/to/scripts/verify_install.py
+cd /tmp && /tmp/clean/bin/python "$OLDPWD/scripts/verify_install.py"
 ```
 
 `scripts/verify_install.py` runs against the installed package with the source
