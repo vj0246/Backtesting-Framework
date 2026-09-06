@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.arena import Arena
-from quantgauntlet.execution import CostModel, EngineConfig
-from quantgauntlet.strategy import BatchRuleStrategy, RuleBasedStrategy, Strategy
+from fullbacktester.arena import Arena
+from fullbacktester.execution import CostModel, EngineConfig
+from fullbacktester.strategy import BatchRuleStrategy, RuleBasedStrategy, Strategy
 
 
 def momentum(view):

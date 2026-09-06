@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/quantgauntlet
+      url: https://test.pypi.org/p/FullBacktester
     permissions:
       id-token: write  # mandatory for trusted publishing
       contents: read
@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/quantgauntlet
+      url: https://pypi.org/p/FullBacktester
     permissions:
       id-token: write  # mandatory for trusted publishing
       contents: read

@@ -4,19 +4,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.execution import (
+from fullbacktester.execution import (
     EngineConfig,
     EventDrivenEngine,
     VectorizedEngine,
     compare_engines,
 )
-from quantgauntlet.strategy.ml import (
+from fullbacktester.strategy.ml import (
     WalkForwardMLStrategy,
     forward_returns,
     long_short_top_k,
     signed_equal_weight,
 )
-from quantgauntlet.validation import FutureLeakTester
+from fullbacktester.validation import FutureLeakTester
 
 
 class Ridge:

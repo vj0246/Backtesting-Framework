@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.data.panel import Panel
-from quantgauntlet.markets import US, Frequency, Market
+from fullbacktester.data.panel import Panel
+from fullbacktester.markets import US, Frequency, Market
 
 PanelFactory = Callable[..., Panel]
 

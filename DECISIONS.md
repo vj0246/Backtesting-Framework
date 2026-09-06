@@ -167,9 +167,9 @@ interpreter speedup. The inherited venv was 3.10; a 3.12 venv replaces it.
 **Date:** 2026-09-06
 
 **Context.** `ubt` was a placeholder. PyPI check: `gauntlet` and `tribunal` taken;
-`quantgauntlet`, `strictbt`, `veribt` available.
+`fullbacktester`, `strictbt`, `veribt` available.
 
-**Resolution.** `quantgauntlet`, import alias `qg`. It says what the package does
+**Resolution.** `fullbacktester`, import alias `fbt`. It says what the package does
 (strategies run the gauntlet) and is brandable. Provisional until the owner objects; a
 rename is a mechanical find-and-replace over `src/`, `tests/`, and `pyproject.toml`.
 
@@ -358,3 +358,34 @@ samples. Each refit appends a `TrainingRecord(fitted_at, label_cutoff, n_samples
 can assert the rule held on every refit. `PurgedKFold` applies the same idea offline:
 training indices within `purge` of either edge of the test fold are dropped, plus `embargo`
 after it. Feature/label functions receive the view only; the static scanner scans both.
+
+---
+
+## D-016: Package name, FullBacktester (supersedes D-006)
+
+**Date:** 2026-09-07
+
+**Context.** D-006 chose `quantgauntlet` as a provisional name, flagged as pending the
+owner's confirmation. The owner chose `FullBacktester`. Nothing had been published, so the
+name was still free to change at zero cost.
+
+**Positions.**
+- *A (`FullBacktester`, the owner's choice):* plain, searchable, says what the thing is.
+- *B (keep `quantgauntlet`):* names the differentiator, which is the gauntlet of leakage and
+  overfitting checks rather than breadth of features.
+
+**Concern raised and overruled.** "Full" reads as a completeness claim, and the README's
+Limitations section states the opposite in several places: no options, no futures margining,
+no borrow costs, no FX, corporate actions not point-in-time. A package whose entire design
+principle is refusing to overclaim carries some tension in the name. The owner confirmed the
+choice, so A stands.
+
+**Resolution.** A. Distribution name `FullBacktester`, preserving the owner's capitalization
+on the PyPI page. Import name `fullbacktester`, lowercase, because module names must be
+(PEP 8). Documentation alias `fbt`, replacing `qg`.
+
+**Consequences.** Mechanical rename of 213 references across 46 files plus the package
+directory. Nothing had been published to any index, so no compatibility shim is needed and
+no version was burned. The Limitations section stays exactly as written; it now does more
+work, because the name no longer does it.
+

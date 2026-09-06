@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.data.panel import Panel
-from quantgauntlet.data.schema import SchemaError, validate_bars
-from quantgauntlet.markets import INDIA, US, Frequency
+from fullbacktester.data.panel import Panel
+from fullbacktester.data.schema import SchemaError, validate_bars
+from fullbacktester.markets import INDIA, US, Frequency
 
 
 def test_view_cannot_see_past_its_end(panel):

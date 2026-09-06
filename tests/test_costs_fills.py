@@ -4,19 +4,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.data.panel import Panel
-from quantgauntlet.execution.config import EngineConfig
-from quantgauntlet.execution.costs import (
+from fullbacktester.data.panel import Panel
+from fullbacktester.execution.config import EngineConfig
+from fullbacktester.execution.costs import (
     BpsCommission,
     CostModel,
     FixedSlippage,
     PerUnitCommission,
     VolumeShareSlippage,
 )
-from quantgauntlet.execution.fills import FillModel
-from quantgauntlet.execution.ledger import Ledger
-from quantgauntlet.execution.orders import Order, OrderStatus, OrderType, TimeInForce
-from quantgauntlet.markets import US
+from fullbacktester.execution.fills import FillModel
+from fullbacktester.execution.ledger import Ledger
+from fullbacktester.execution.orders import Order, OrderStatus, OrderType, TimeInForce
+from fullbacktester.markets import US
 
 
 def _two_bar_panel(open_=100.0, high=105.0, low=95.0, close=102.0, volume=1_000.0) -> Panel:

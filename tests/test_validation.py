@@ -3,10 +3,10 @@
 import pandas as pd
 import pytest
 
-from quantgauntlet.execution import EngineConfig
-from quantgauntlet.flags import Severity
-from quantgauntlet.strategy import BatchRuleStrategy, RuleBasedStrategy, Strategy, WeightStrategy
-from quantgauntlet.validation import FutureLeakTester, PurgedKFold, StaticScanner, validate
+from fullbacktester.execution import EngineConfig
+from fullbacktester.flags import Severity
+from fullbacktester.strategy import BatchRuleStrategy, RuleBasedStrategy, Strategy, WeightStrategy
+from fullbacktester.validation import FutureLeakTester, PurgedKFold, StaticScanner, validate
 
 # ------------------------------------------------------------------ scanner
 

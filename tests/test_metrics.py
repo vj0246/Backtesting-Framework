@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.metrics import (
+from fullbacktester.metrics import (
     compute_metrics,
     deflated_sharpe_ratio,
     expected_max_sharpe,

@@ -6,7 +6,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from quantgauntlet.execution import (
+from fullbacktester.execution import (
     CostModel,
     EngineConfig,
     EventDrivenEngine,
@@ -16,9 +16,9 @@ from quantgauntlet.execution import (
     VolumeShareSlippage,
     compare_engines,
 )
-from quantgauntlet.execution.costs import BpsCommission
-from quantgauntlet.flags import Severity
-from quantgauntlet.strategy import BatchRuleStrategy, RuleBasedStrategy, Strategy
+from fullbacktester.execution.costs import BpsCommission
+from fullbacktester.flags import Severity
+from fullbacktester.strategy import BatchRuleStrategy, RuleBasedStrategy, Strategy
 from tests.conftest import make_panel
 
 

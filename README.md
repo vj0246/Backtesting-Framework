@@ -1,10 +1,10 @@
-# quantgauntlet
+# FullBacktester
 
 [![CI](https://github.com/vj0246/Backtesting-Framework/actions/workflows/ci.yml/badge.svg)](https://github.com/vj0246/Backtesting-Framework/actions/workflows/ci.yml)
 
 Backtesting for people who have been burned by backtests.
 
-`quantgauntlet` runs trading strategies through a gauntlet of checks that most
+`fullbacktester` runs trading strategies through a gauntlet of checks that most
 frameworks leave to the user's discipline: point-in-time data access that makes
 look-ahead a construction error, two execution engines whose disagreement is
 itself a diagnostic, static and behavioural leakage detectors, data-quality and
@@ -31,43 +31,44 @@ strategies you tried before picking this one.
 ## Install
 
 ```bash
-pip install quantgauntlet                 # core: numpy, pandas, pyarrow
-pip install "quantgauntlet[yfinance]"     # Yahoo Finance adapter (US, India .NS/.BO, crypto)
-pip install "quantgauntlet[nse]"          # NSE India official bhavcopy adapter
-pip install "quantgauntlet[calendars]"    # holiday-aware session counts via exchange_calendars
-pip install "quantgauntlet[all]"
+pip install FullBacktester                 # core: numpy, pandas, pyarrow
+pip install "FullBacktester[yfinance]"     # Yahoo Finance adapter (US, India .NS/.BO, crypto)
+pip install "FullBacktester[nse]"          # NSE India official bhavcopy adapter
+pip install "FullBacktester[calendars]"    # holiday-aware session counts via exchange_calendars
+pip install "FullBacktester[all]"
 ```
 
-Python 3.11 or newer.
+Python 3.11 or newer. The distribution is `FullBacktester`; the import is
+`fullbacktester`, lowercase, because Python module names have to be.
 
 ## Quickstart
 
 ```python
-import quantgauntlet as qg
+import fullbacktester as fbt
 
 # 1. Data. Daily bars for two US names, cached locally as Parquet after the first pull.
-panel = qg.load_panel(["AAPL", "MSFT", "GOOGL"], "2018-01-01", "2024-12-31", market="US")
+panel = fbt.load_panel(["AAPL", "MSFT", "GOOGL"], "2018-01-01", "2024-12-31", market="US")
 
 # 2. A strategy: target weights from everything known at the current bar.
-def momentum(view: qg.PanelView) -> dict[str, float]:
+def momentum(view: fbt.PanelView) -> dict[str, float]:
     close = view.close
     up = (close.iloc[-1] / close.iloc[-126] - 1.0 > 0).astype(float)
     return (up / max(up.sum(), 1.0)).to_dict()
 
 # 3. Execution assumptions, shared by every strategy you compare.
-config = qg.EngineConfig(
+config = fbt.EngineConfig(
     initial_cash=1_000_000,
-    cost_model=qg.CostModel(
-        commission=qg.BpsCommission(1.0),
-        slippage=qg.VolumeShareSlippage(impact_coefficient=0.1),
+    cost_model=fbt.CostModel(
+        commission=fbt.BpsCommission(1.0),
+        slippage=fbt.VolumeShareSlippage(impact_coefficient=0.1),
     ),
     max_participation=0.05,
     max_gross_leverage=1.0,
 )
 
 # 4. Run the gauntlet.
-arena = qg.Arena(panel, config)
-arena.add(qg.RuleBasedStrategy(momentum, warmup=126), "momentum_6m")
+arena = fbt.Arena(panel, config)
+arena.add(fbt.RuleBasedStrategy(momentum, warmup=126), "momentum_6m")
 result = arena.run()
 print(result.summary())
 ```
@@ -80,20 +81,20 @@ with every HIGH-severity finding printed underneath.
 ### Indian equities
 
 ```python
-panel = qg.load_panel(["RELIANCE", "TCS", "INFY"], "2015-01-01", "2024-12-31", market="IN")
+panel = fbt.load_panel(["RELIANCE", "TCS", "INFY"], "2015-01-01", "2024-12-31", market="IN")
 # adjusted prices from Yahoo (.NS suffix added for you)
 
-nse = qg.NSEBhavcopySource()
+nse = fbt.NSEBhavcopySource()
 universe = nse.list_symbols(date(2020, 1, 1))     # every EQ/BE symbol listed that day
-raw = qg.load_panel(universe[:50], "2020-01-01", "2020-12-31", market="IN", source=nse)
+raw = fbt.load_panel(universe[:50], "2020-01-01", "2020-12-31", market="IN", source=nse)
 # official, survivorship-free, UNADJUSTED: use for universe membership and volume checks
 ```
 
 ### Local files
 
 ```python
-src = qg.LocalSource("data/")                       # data/AAPL.csv, data/MSFT.parquet, ...
-panel = qg.load_panel(["AAPL", "MSFT"], "2020-01-01", "2023-12-31", market="US", source=src)
+src = fbt.LocalSource("data/")                       # data/AAPL.csv, data/MSFT.parquet, ...
+panel = fbt.load_panel(["AAPL", "MSFT"], "2020-01-01", "2023-12-31", market="US", source=src)
 ```
 
 Naive dates are treated as session dates and stamped at the market's close.
@@ -145,7 +146,7 @@ cost drag. Annualization comes from the panel's market and bar frequency (252
 US sessions, 250 Indian sessions, 365 crypto days, intraday multiples of each).
 Undefined statistics are NaN, never zero.
 
-`quantgauntlet.metrics` also exposes `probabilistic_sharpe_ratio`,
+`fullbacktester.metrics` also exposes `probabilistic_sharpe_ratio`,
 `deflated_sharpe_ratio`, `minimum_backtest_length`, and
 `probability_of_backtest_overfitting` (CSCV) for use outside an arena.
 
@@ -164,7 +165,7 @@ keyed by source, market, frequency, and symbol.
 
 Adding a source is one class: subclass `DataSource`, declare `name`, `markets`,
 `frequencies`, `adjusted`, `survivorship_free`, implement `fetch`, and call
-`quantgauntlet.data.sources.register`.
+`fullbacktester.data.sources.register`.
 
 ## Limitations
 

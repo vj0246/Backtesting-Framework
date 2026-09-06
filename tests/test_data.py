@@ -6,15 +6,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantgauntlet.data.cache import CacheKey, ParquetCache
-from quantgauntlet.data.loader import load_bars, load_panel
-from quantgauntlet.data.quality import check_data_quality
-from quantgauntlet.data.sources import LocalSource, available_sources, get_source
-from quantgauntlet.data.sources.base import DataSource
-from quantgauntlet.data.sources.nse import NSEBhavcopySource
-from quantgauntlet.data.sources.yfinance import YFinanceSource
-from quantgauntlet.flags import Severity
-from quantgauntlet.markets import INDIA, US, Frequency
+from fullbacktester.data.cache import CacheKey, ParquetCache
+from fullbacktester.data.loader import load_bars, load_panel
+from fullbacktester.data.quality import check_data_quality
+from fullbacktester.data.sources import LocalSource, available_sources, get_source
+from fullbacktester.data.sources.base import DataSource
+from fullbacktester.data.sources.nse import NSEBhavcopySource
+from fullbacktester.data.sources.yfinance import YFinanceSource
+from fullbacktester.flags import Severity
+from fullbacktester.markets import INDIA, US, Frequency
 
 
 def _write_csv(directory, symbol, dates, price=100.0):
@@ -162,7 +162,7 @@ def test_quality_checks_flag_jumps_gaps_zero_volume_and_stale(panel_factory):
     ] *= 2.0
     drop_ts = bars.loc[bars["symbol"] == "S2", "timestamp"].iloc[10]
     bars = bars[~((bars["symbol"] == "S2") & (bars["timestamp"] == drop_ts))]
-    from quantgauntlet.data.panel import Panel
+    from fullbacktester.data.panel import Panel
 
     dirty = Panel.from_bars(bars, market=US)
     flags = check_data_quality(dirty)

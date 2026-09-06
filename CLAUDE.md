@@ -1,7 +1,8 @@
-# CLAUDE.md — quantgauntlet
+# CLAUDE.md — FullBacktester
 
 Backtesting engine with built-in defenses against look-ahead, survivorship bias, unrealistic
-execution, and overfitting. Publishable Python package (PyPI name `quantgauntlet`, alias `qg`).
+execution, and overfitting. Publishable Python package (PyPI distribution `FullBacktester`, import
+`fullbacktester`, alias `fbt`).
 Owner: beginner-to-intermediate quant evaluating several strategies against each other.
 Focus markets: US and India first, others as data quality allows.
 
@@ -46,7 +47,7 @@ release is a GitHub Release tagged `v<version>`, and the workflow refuses to
 publish when the tag and `pyproject.toml` version disagree. A PyPI version can
 never be reused, so the `pypi` environment should require a reviewer.
 
-## Module map (`src/quantgauntlet/`)
+## Module map (`src/fullbacktester/`)
 
 | Module | Owns |
 |---|---|

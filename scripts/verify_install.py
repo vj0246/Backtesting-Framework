@@ -1,4 +1,4 @@
-"""Verify an *installed* quantgauntlet, not the source tree.
+"""Verify an *installed* fullbacktester, not the source tree.
 
 Run this against a virtual environment that has the built wheel installed and
 no access to ``src/``. It catches the packaging faults a normal test run cannot
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import quantgauntlet as qg
+import fullbacktester as fbt
 
 FAILURES: list[str] = []
 
@@ -35,31 +35,31 @@ def check(label: str, condition: bool, detail: str = "") -> None:
 
 
 def main() -> int:
-    print(f"quantgauntlet {qg.__version__} from {Path(qg.__file__).parent}")
+    print(f"fullbacktester {fbt.__version__} from {Path(fbt.__file__).parent}")
 
     print("\npackaging")
-    package_dir = Path(qg.__file__).parent
-    check("not importing from a source checkout", package_dir.name == "quantgauntlet")
+    package_dir = Path(fbt.__file__).parent
+    check("not importing from a source checkout", package_dir.name == "fullbacktester")
     check("py.typed marker shipped", (package_dir / "py.typed").is_file())
-    missing = [name for name in qg.__all__ if not hasattr(qg, name)]
+    missing = [name for name in fbt.__all__ if not hasattr(fbt, name)]
     check("every __all__ entry resolves", not missing, f"missing {missing}" if missing else "")
 
     print("\nsubmodules import")
     for module in (
-        "quantgauntlet.arena",
-        "quantgauntlet.data.cache",
-        "quantgauntlet.data.loader",
-        "quantgauntlet.data.quality",
-        "quantgauntlet.data.sources.local",
-        "quantgauntlet.data.sources.nse",
-        "quantgauntlet.data.sources.yfinance",
-        "quantgauntlet.execution.compare",
-        "quantgauntlet.execution.event_driven",
-        "quantgauntlet.execution.vectorized",
-        "quantgauntlet.metrics.overfitting",
-        "quantgauntlet.strategy.ml",
-        "quantgauntlet.validation.perturbation",
-        "quantgauntlet.validation.static_scanner",
+        "fullbacktester.arena",
+        "fullbacktester.data.cache",
+        "fullbacktester.data.loader",
+        "fullbacktester.data.quality",
+        "fullbacktester.data.sources.local",
+        "fullbacktester.data.sources.nse",
+        "fullbacktester.data.sources.yfinance",
+        "fullbacktester.execution.compare",
+        "fullbacktester.execution.event_driven",
+        "fullbacktester.execution.vectorized",
+        "fullbacktester.metrics.overfitting",
+        "fullbacktester.strategy.ml",
+        "fullbacktester.validation.perturbation",
+        "fullbacktester.validation.static_scanner",
     ):
         try:
             importlib.import_module(module)
@@ -78,16 +78,16 @@ def main() -> int:
 
     print("\nengine")
     rng = np.random.default_rng(0)
-    sessions = qg.US.expected_sessions(
+    sessions = fbt.US.expected_sessions(
         pd.Timestamp("2023-01-03").date(), pd.Timestamp("2024-12-31").date()
     )
-    stamps = pd.DatetimeIndex([qg.US.session_close_utc(d) for d in sessions])
+    stamps = pd.DatetimeIndex([fbt.US.session_close_utc(d) for d in sessions])
     symbols = ["AAA", "BBB", "CCC"]
     close = 100 * np.exp(np.cumsum(rng.normal(0.0003, 0.011, (len(stamps), 3)), axis=0))
     prev = np.vstack([close[:1], close[:-1]])
     open_ = prev * (1 + rng.normal(0, 0.002, close.shape))
     wide = lambda a: pd.DataFrame(a, index=stamps, columns=symbols)  # noqa: E731
-    panel = qg.Panel.from_wide(
+    panel = fbt.Panel.from_wide(
         wide(close),
         open=wide(open_),
         high=wide(np.maximum(open_, close) * 1.004),
@@ -96,13 +96,13 @@ def main() -> int:
         market="US",
     )
 
-    def momentum(view: qg.PanelView) -> pd.Series:
+    def momentum(view: fbt.PanelView) -> pd.Series:
         c = view.close
         up = (c.iloc[-1] / c.iloc[-63] - 1 > 0).astype(float)
         return up / max(up.sum(), 1.0)
 
-    strategy = qg.RuleBasedStrategy(momentum, warmup=63)
-    result = qg.EventDrivenEngine(qg.EngineConfig(cost_model=qg.CostModel.bps(2, 3))).run(
+    strategy = fbt.RuleBasedStrategy(momentum, warmup=63)
+    result = fbt.EventDrivenEngine(fbt.EngineConfig(cost_model=fbt.CostModel.bps(2, 3))).run(
         strategy, panel
     )
     metrics = result.metrics()
@@ -113,7 +113,7 @@ def main() -> int:
     check("annualization from the market", metrics.bars_per_year == 252.0)
     check("sharpe is finite", np.isfinite(metrics.sharpe), f"{metrics.sharpe:.3f}")
 
-    comparison = qg.compare_engines(strategy, panel, qg.EngineConfig.idealized())
+    comparison = fbt.compare_engines(strategy, panel, fbt.EngineConfig.idealized())
     check(
         "engines agree under idealized execution",
         comparison.agrees(),
@@ -121,17 +121,17 @@ def main() -> int:
     )
 
     print("\nvalidation")
-    report = qg.validate(strategy, panel, n_samples=2)
+    report = fbt.validate(strategy, panel, n_samples=2)
     check(
         "clean strategy raises no HIGH findings", not report.has_high, f"score {report.score}/100"
     )
 
-    def leaky(view: qg.PanelView) -> pd.DataFrame:
+    def leaky(view: fbt.PanelView) -> pd.DataFrame:
         c = view.close
         signal = (c.shift(-1) / c - 1 > 0).astype(float)
         return signal.div(signal.sum(axis=1).clip(lower=1.0), axis=0)
 
-    leaky_report = qg.validate(qg.BatchRuleStrategy(leaky, warmup=1), panel, n_samples=2)
+    leaky_report = fbt.validate(fbt.BatchRuleStrategy(leaky, warmup=1), panel, n_samples=2)
     check("look-ahead strategy is caught", leaky_report.has_high, f"score {leaky_report.score}/100")
 
     print()

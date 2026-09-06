@@ -1,5 +1,5 @@
 [project]
-name = "quantgauntlet"
+name = "FullBacktester"
 version = "0.1.0"
 description = "Backtesting engine with built-in defenses against look-ahead bias, survivorship bias, and overfitting: point-in-time data access, dual cross-checked engines, leakage scanners, and deflated performance statistics."
 readme = "README.md"
@@ -47,12 +47,12 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/quantgauntlet"]
+packages = ["src/fullbacktester"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-filterwarnings = ["error::DeprecationWarning:quantgauntlet.*"]
+filterwarnings = ["error::DeprecationWarning:fullbacktester.*"]
 
 [tool.ruff]
 line-length = 100
@@ -72,7 +72,7 @@ ignore = ["RUF012"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-files = ["src/quantgauntlet"]
+files = ["src/fullbacktester"]
 
 [[tool.mypy.overrides]]
 module = ["yfinance.*", "exchange_calendars.*", "pyarrow.*", "platformdirs.*", "requests.*"]
