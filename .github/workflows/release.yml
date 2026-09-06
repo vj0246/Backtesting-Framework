@@ -1,0 +1,144 @@
+# Publishing to PyPI with Trusted Publishing (OIDC). No API tokens are stored
+# anywhere; GitHub proves this repository's identity to PyPI directly.
+#
+# ONE-TIME SETUP, required before the first run:
+#
+#   1. On PyPI: Your projects -> Publishing (or, for a name never published
+#      before, https://pypi.org/manage/account/publishing/) -> add a
+#      "pending publisher" with:
+#           Owner:            vj0246
+#           Repository:       Backtesting-Framework
+#           Workflow name:    release.yml
+#           Environment name: pypi
+#   2. Repeat on https://test.pypi.org with environment name: testpypi
+#   3. In this repo: Settings -> Environments -> create "pypi" and "testpypi".
+#      Add required reviewers on "pypi" so a real person approves every
+#      upload. A version number can never be reused on PyPI, so this gate is
+#      the last chance to stop a mistake.
+#
+# USAGE:
+#   Dry run   -> Actions -> Release -> Run workflow -> target: testpypi
+#   Real      -> tag and publish a GitHub Release named v<version>, e.g. v0.1.0
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Index to publish to
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  build:
+    name: build and verify
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: read the declared version
+        id: version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+          with open("pyproject.toml", "rb") as fh:
+              print(f"version={tomllib.load(fh)['project']['version']}")
+          PY
+
+      - name: the release tag must match the declared version
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared="${{ steps.version.outputs.version }}"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::release tag '$GITHUB_REF_NAME' does not match pyproject version '$declared'"
+            exit 1
+          fi
+          echo "tag and version agree on $declared"
+
+      # An upload cannot be undone and a version cannot be reused, so the full
+      # suite runs here rather than trusting that CI passed on some other commit.
+      - name: install and test
+        run: |
+          python -m pip install -e ".[dev,all]"
+          pytest -q
+          ruff check src tests examples scripts
+          mypy
+
+      - name: build sdist and wheel
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
+
+      - name: install the wheel into an empty environment and exercise it
+        run: |
+          python -m venv "$RUNNER_TEMP/clean"
+          "$RUNNER_TEMP/clean/bin/python" -m pip install --quiet dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/clean/bin/python" "$GITHUB_WORKSPACE/scripts/verify_install.py"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    name: publish to TestPyPI
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/quantgauntlet
+    permissions:
+      id-token: write  # mandatory for trusted publishing
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # TestPyPI accumulates junk from dry runs; do not fail a rerun.
+          skip-existing: true
+
+  publish-pypi:
+    name: publish to PyPI
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/quantgauntlet
+    permissions:
+      id-token: write  # mandatory for trusted publishing
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

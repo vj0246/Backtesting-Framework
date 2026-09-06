@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  quality:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev,all]"
+      - name: ruff lint
+        run: ruff check src tests examples scripts
+      - name: ruff format
+        run: ruff format --check src tests examples scripts
+      - name: mypy
+        run: mypy
+
+  test:
+    name: tests py${{ matrix.python }} ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          # The maintainer develops on Windows and pandas/zoneinfo behaviour
+          # differs there, so keep one Windows and one macOS leg.
+          - os: windows-latest
+            python: "3.12"
+          - os: macos-latest
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev,all]"
+      - name: pytest
+        run: pytest -q
+
+  test-core-only:
+    # The extras are advertised as optional, so prove it: the adapters must
+    # import without their third-party packages and the market calendars must
+    # fall back to weekday counting instead of raising.
+    name: tests without optional extras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - name: confirm no extras leaked into the environment
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          leaked = [n for n in ("yfinance", "requests", "exchange_calendars")
+                    if importlib.util.find_spec(n) is not None]
+          if leaked:
+              sys.exit(f"optional extras unexpectedly installed: {leaked}")
+          print("no optional extras installed, as intended")
+          PY
+      - name: pytest
+        run: pytest -q
+
+  package:
+    name: build and clean-room install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"  # the declared floor, not the dev version
+      - run: python -m pip install build twine
+      - name: build sdist and wheel
+        run: python -m build
+      - name: check distribution metadata
+        run: python -m twine check dist/*
+      - name: install the wheel into an empty environment and exercise it
+        run: |
+          python -m venv "$RUNNER_TEMP/clean"
+          "$RUNNER_TEMP/clean/bin/python" -m pip install --quiet dist/*.whl
+          # Run from elsewhere so src/ cannot satisfy the import.
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/clean/bin/python" "$GITHUB_WORKSPACE/scripts/verify_install.py"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7

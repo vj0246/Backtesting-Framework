@@ -15,10 +15,36 @@ Venv: `.venv` (Python 3.12). `.venv_pypi` is a stale leftover, safe to delete.
 
 ```
 .venv\Scripts\python.exe -m pytest -q                 # full suite
-.venv\Scripts\ruff.exe check src tests; .venv\Scripts\ruff.exe format src tests
+.venv\Scripts\ruff.exe check src tests examples scripts
+.venv\Scripts\ruff.exe format src tests examples scripts
+.venv\Scripts\python.exe -m mypy                      # strict, src only
 .venv\Scripts\python.exe examples\quickstart.py       # offline synthetic demo
 uv pip install --python .venv\Scripts\python.exe -e ".[dev,all]"
+uv build                                              # sdist + wheel into dist/
 ```
+
+## CI and release
+
+`.github/workflows/ci.yml` on every push and PR to main:
+
+| Job | What it guards |
+|---|---|
+| `quality` | ruff lint, ruff format, mypy strict (3.12) |
+| `test` | pytest on 3.11/3.12/3.13 Linux, plus Windows and macOS on 3.12 |
+| `test-core-only` | the suite with **no** optional extras, proving lazy imports and the weekday-calendar fallback |
+| `package` | build, `twine check`, install the wheel into an empty venv and run `scripts/verify_install.py` |
+
+`scripts/verify_install.py` tests the *installed* package with the source tree
+off `sys.path`. It is the only thing that catches a module missing from the
+wheel, a lost `py.typed`, a stale `__all__` entry, or an extra that is not
+actually optional. Run it after any change to packaging or `__init__.py`.
+
+`.github/workflows/release.yml` publishes via PyPI Trusted Publishing (OIDC, no
+stored token). Its header comments carry the one-time PyPI and GitHub
+Environment setup. Dry run goes to TestPyPI via workflow_dispatch; a real
+release is a GitHub Release tagged `v<version>`, and the workflow refuses to
+publish when the tag and `pyproject.toml` version disagree. A PyPI version can
+never be reused, so the `pypi` environment should require a reviewer.
 
 ## Module map (`src/quantgauntlet/`)
 

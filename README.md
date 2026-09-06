@@ -1,5 +1,7 @@
 # quantgauntlet
 
+[![CI](https://github.com/vj0246/Backtesting-Framework/actions/workflows/ci.yml/badge.svg)](https://github.com/vj0246/Backtesting-Framework/actions/workflows/ci.yml)
+
 Backtesting for people who have been burned by backtests.
 
 `quantgauntlet` runs trading strategies through a gauntlet of checks that most
@@ -187,9 +189,42 @@ Adding a source is one class: subclass `DataSource`, declare `name`, `markets`,
 python -m venv .venv && .venv/Scripts/activate   # or source .venv/bin/activate
 pip install -e ".[dev,all]"
 pytest                                            # ~80 tests incl. hypothesis property tests
-ruff check src tests && ruff format --check src tests
+ruff check src tests examples scripts && ruff format --check src tests examples scripts
 mypy
 ```
+
+CI runs the suite on Python 3.11, 3.12, and 3.13 on Linux plus one Windows and
+one macOS leg, and separately with **no optional extras installed**, because the
+extras are advertised as optional and the adapters must import without them.
+
+A passing test suite does not prove the *package* is sound. To check what users
+will actually install, build it and exercise the installed copy:
+
+```bash
+python -m build
+python -m twine check dist/*
+python -m venv /tmp/clean && /tmp/clean/bin/python -m pip install dist/*.whl
+cd /tmp && /tmp/clean/bin/python path/to/scripts/verify_install.py
+```
+
+`scripts/verify_install.py` runs against the installed package with the source
+tree off the path. It catches what a test run cannot: a module missing from the
+wheel, a lost `py.typed` marker, a stale `__all__` entry, an extra that is not
+really optional.
+
+## Releasing
+
+Publishing uses PyPI Trusted Publishing, so no API token is stored anywhere.
+The one-time PyPI and GitHub Environment setup is documented at the top of
+`.github/workflows/release.yml`. Once that is done:
+
+1. Dry run: Actions -> Release -> Run workflow -> target `testpypi`.
+2. Real release: bump `version` in `pyproject.toml`, commit, then publish a
+   GitHub Release tagged `v<version>`. The workflow refuses to publish if the
+   tag and the declared version disagree.
+
+A PyPI version can never be re-uploaded, so the `pypi` environment should have a
+required reviewer. That approval is the last chance to stop a bad release.
 
 `DECISIONS.md` records every architectural decision with the argument that was
 had and why the resolution won. `CLAUDE.md` is the map of the codebase.
