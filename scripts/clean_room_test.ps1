@@ -24,27 +24,48 @@ param(
 
 $ErrorActionPreference = "Stop"
 $project = Split-Path -Parent $PSScriptRoot
-$cleanEnv = Join-Path $env:TEMP "qg-cleanroom"
+$cleanEnv = Join-Path $env:TEMP "fbt-cleanroom"
 
 function Step($number, $text) {
     Write-Host ""
     Write-Host "[$number/4] $text" -ForegroundColor Cyan
 }
 
+# Windows PowerShell turns a native command's stderr into a terminating error
+# while $ErrorActionPreference is "Stop". Tools like uv and twine write ordinary
+# progress to stderr, so success would be reported as failure. Run native
+# commands with that preference relaxed and judge them by their exit code.
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory)][scriptblock]$Command,
+        [Parameter(Mandatory)][string]$What
+    )
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & $Command } finally { $ErrorActionPreference = $previous }
+    if ($LASTEXITCODE -ne 0) { throw "$What failed (exit code $LASTEXITCODE)" }
+}
+
 Push-Location $project
 try {
+    $venvPython = Join-Path $project ".venv\Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) { throw "no development environment at .venv" }
+
     Step 1 "Building sdist and wheel"
-    uv build
-    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+    # Clear dist/ first. Artifacts from an earlier name or version linger there,
+    # and `twine upload dist/*` would happily publish every one of them.
+    $dist = Join-Path $project "dist"
+    if (Test-Path $dist) {
+        Get-ChildItem $dist -Include *.whl, *.tar.gz -Recurse | Remove-Item -Force
+    }
+    Invoke-Native { uv build } "uv build"
 
     Step 2 "Validating distribution metadata"
-    & (Join-Path $project ".venv\Scripts\python.exe") -m twine check "$project\dist\*"
-    if ($LASTEXITCODE -ne 0) { throw "twine check failed" }
+    Invoke-Native { & $venvPython -m twine check "$project\dist\*" } "twine check"
 
     Step 3 "Installing the wheel into an empty Python $PythonVersion environment"
     if (Test-Path $cleanEnv) { Remove-Item -Recurse -Force $cleanEnv }
-    uv venv $cleanEnv --python $PythonVersion
-    if ($LASTEXITCODE -ne 0) { throw "could not create the clean environment" }
+    Invoke-Native { uv venv $cleanEnv --python $PythonVersion } "creating the clean environment"
 
     $wheel = Get-ChildItem (Join-Path $project "dist\*.whl") |
         Sort-Object LastWriteTime -Descending |
@@ -53,21 +74,18 @@ try {
     Write-Host "      $($wheel.Name)"
 
     $cleanPython = Join-Path $cleanEnv "Scripts\python.exe"
-    uv pip install --python $cleanPython $wheel.FullName
-    if ($LASTEXITCODE -ne 0) { throw "the wheel failed to install" }
+    Invoke-Native { uv pip install --python $cleanPython $wheel.FullName } "installing the wheel"
 
     Step 4 "Exercising the installed package with the source tree off sys.path"
     # Run from the temp directory: if an import only works because src/ happens
     # to be next to it, that is exactly the bug this is here to catch.
     Push-Location $env:TEMP
     try {
-        & $cleanPython (Join-Path $project "scripts\verify_install.py")
-        $verifyCode = $LASTEXITCODE
+        Invoke-Native { & $cleanPython (Join-Path $project "scripts\verify_install.py") } "verify_install.py"
     }
     finally {
         Pop-Location
     }
-    if ($verifyCode -ne 0) { throw "verify_install.py reported failures" }
 
     Write-Host ""
     Write-Host "The built package is sound. Safe to publish." -ForegroundColor Green
