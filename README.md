@@ -137,6 +137,58 @@ read the flags.
 **Arena.** Same panel, same config, same checks for every entry, and the
 overfitting statistics use the number of entries as the number of trials.
 
+## Paper trading
+
+Run a strategy forward on live data under exactly the backtest's execution rules. The same
+`on_bar` runs; only the source of the next bar changes.
+
+```python
+import fullbacktester as fbt
+
+# Register once. Strategies and costs are fingerprinted here.
+fbt.PaperSession.create(
+    "sessions/momentum.db",
+    name="momentum",
+    strategies={"momentum_6m": fbt.RuleBasedStrategy(momentum, warmup=126)},
+    symbols=["RELIANCE", "TCS", "INFY"],
+    market="IN",
+    config=config,
+)
+
+# Then once per day, after the close, from a scheduled task:
+session = fbt.PaperSession.open("sessions/momentum.db", strategies=..., config=config)
+print(session.step())
+```
+
+State lives in SQLite, so nothing is lost to a reboot and each run is idempotent. If the
+machine was off for three days, the next run replays those three bars in order, exactly as
+the backtester would have.
+
+Three properties are worth knowing about.
+
+**Bars are written once and never rewritten.** A provider that later restates a close gets a
+row in `bar_revisions` and a WARN; the original stays, because it is what the strategy
+actually traded on. Without this the record silently becomes a log of decisions nobody made.
+
+**The session locks to the code it was registered with.** Edit the strategy or soften the
+costs and `open` raises `SessionLockError`. Retuning mid-run while claiming a continuous live
+record is the most common way people fool themselves; start a new session instead.
+
+**Two comparisons, answering different questions.**
+
+```python
+fbt.replay_check(result, strategy, session.panel(), config)   # should always agree
+fbt.expectation_gap(result, earlier_backtest)                 # expected to differ
+```
+
+`replay_check` re-runs the strategy through the backtester over the session's own recorded
+bars. Disagreement means the live loop and the backtest have drifted apart, which is a bug.
+`expectation_gap` compares live against the backtest that justified trading the strategy. A
+large negative gap is the signal you paper traded to get: the edge you measured is not the
+edge you are getting.
+
+See `examples/paper_trading.py` for the whole cycle, offline.
+
 ## Metrics
 
 `BacktestResult.metrics()` gives total return, CAGR, annualized volatility,

@@ -427,3 +427,63 @@ three dropped sessions against three added weekend bars, which the old arithmeti
 see. Worth recording that no synthetic fixture would ever have found this: the bug needed a
 market whose real calendar disagrees with the reference calendar, which is precisely why the
 real-data run was worth doing before adding features.
+
+---
+
+## D-018: Paper trading as the same computation, driven by a clock
+
+**Date:** 2026-09-08
+
+**Context.** A backtest tells you what would have happened. Paper trading tells you what is
+happening, and only means something if the two are the same computation applied to different
+data. The owner asked for live paper trading that continues from the moment it starts and
+produces reports.
+
+**Positions on process model.**
+- *A (long-running daemon):* hold state in memory, sleep between bars. Simple to write. Loses
+  the entire session to a reboot, a crash, or a laptop lid, and cannot be tested without
+  faking time.
+- *B (stateless runs against durable state):* every invocation opens SQLite, does its work,
+  exits. Task Scheduler or cron owns the clock. Harder up front; each run is idempotent and
+  directly testable.
+
+**Resolution.** B. `step()` is idempotent: calling it with no new bars processes nothing and
+changes nothing, which the tests assert.
+
+**Positions on restated data.** This is the part that decides whether the record is evidence.
+- *A (always take the latest data):* simplest, and silently rewrites history. A provider that
+  restates a close changes what your strategy "decided" months ago, and the paper record
+  becomes a log of decisions nobody made.
+- *B (write once, never update, log disagreements):* bars are stored the first time they are
+  seen and never modified. A later fetch that differs appends to `bar_revisions` and raises a
+  WARN.
+
+**Resolution.** B. It costs a row per revision and buys the only property that matters: the
+whole session replays offline and reproduces every decision exactly.
+
+**Positions on missed runs.**
+- *A (jump to the present):* fast, and silently drops bars from the equity curve.
+- *B (replay every unprocessed bar in order):* identical to backtest semantics, so three days
+  offline then one run equals three daily runs. Enforced by a test.
+
+**Resolution.** B, capped by `max_replay_bars` with a WARN naming the hole rather than
+quietly leaving one.
+
+**Positions on persisting strategies and config.**
+- *A (pickle them into the session):* convenient, unsafe across versions, and lets a strategy
+  be edited between runs while the record pretends to be continuous.
+- *B (fingerprint them, require them to be supplied each run):* the session hashes the
+  strategy source and the execution config at registration and refuses to open when either
+  changed.
+
+**Resolution.** B, and it turns a serialisation limitation into the most useful feature here.
+Retuning a strategy while claiming an unbroken live record is the most common way people fool
+themselves with paper trading. `SessionLockError` makes that impossible rather than merely
+discouraged. Changing costs is blocked for the same reason: softening slippage halfway
+through invalidates everything before it.
+
+**Consequences.** `replay_check` verifies the live loop against the backtester on the
+session's own bars, which is a correctness check and should always pass. `expectation_gap`
+compares live against the backtest that justified trading, which is *expected* to differ and
+is the actual signal. Confusing the two would be easy, so they are separate functions with
+separate docstrings. Ships in 0.2.0; the API is additive and nothing existing changed.

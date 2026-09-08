@@ -42,6 +42,14 @@ from fullbacktester.execution import (
     compare_engines,
 )
 from fullbacktester.flags import Flag, Severity
+from fullbacktester.live import (
+    ExpectationGap,
+    PaperSession,
+    ReplayCheck,
+    SessionLockError,
+    expectation_gap,
+    replay_check,
+)
 from fullbacktester.markets import CRYPTO, INDIA, US, Frequency, Market, get_market
 from fullbacktester.metrics import (
     CSCVResult,
@@ -75,7 +83,7 @@ from fullbacktester.validation import (
     validate,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "CRYPTO",
@@ -94,6 +102,7 @@ __all__ = [
     "EngineComparison",
     "EngineConfig",
     "EventDrivenEngine",
+    "ExpectationGap",
     "FillTiming",
     "FixedSlippage",
     "Flag",
@@ -106,12 +115,15 @@ __all__ = [
     "OrderType",
     "Panel",
     "PanelView",
+    "PaperSession",
     "ParquetCache",
     "PerUnitCommission",
     "PerformanceMetrics",
     "PurgedKFold",
+    "ReplayCheck",
     "RuleBasedStrategy",
     "SchemaError",
+    "SessionLockError",
     "Severity",
     "StaticScanner",
     "Strategy",
@@ -128,6 +140,7 @@ __all__ = [
     "compare_engines",
     "compute_metrics",
     "deflated_sharpe_ratio",
+    "expectation_gap",
     "forward_returns",
     "get_market",
     "get_source",
@@ -137,6 +150,7 @@ __all__ = [
     "minimum_backtest_length",
     "probabilistic_sharpe_ratio",
     "probability_of_backtest_overfitting",
+    "replay_check",
     "signed_equal_weight",
     "validate",
     "validate_bars",

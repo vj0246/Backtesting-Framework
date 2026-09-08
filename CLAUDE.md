@@ -78,6 +78,9 @@ never be reused, so the `pypi` environment should require a reviewer.
 | `validation/cv.py` | `PurgedKFold` |
 | `validation/report.py` | `ValidationReport`, `validate()` |
 | `arena.py` | run N strategies under identical assumptions; DSR uses N as trials; PBO |
+| `live/store.py` | SQLite session state; bars written once and never rewritten, revisions logged |
+| `live/session.py` | `PaperSession`: fingerprint lock, fetch, replay unprocessed bars, persist |
+| `live/report.py` | `replay_check` (machinery correctness), `expectation_gap` (edge decay) |
 
 ## Invariants (tests enforce these; do not break them)
 
@@ -90,6 +93,10 @@ never be reused, so the `pypi` environment should require a reviewer.
 7. `WalkForwardMLStrategy` trains only on samples with `label_end + embargo <= now`.
 8. Undefined metrics are NaN, never 0. Annualization comes from the panel, never a constant.
 9. Every data source declares `adjusted` and `survivorship_free`; caveats become flags.
+10. A `PaperSession` stepped one bar at a time must equal `EventDrivenEngine` on the same
+    bars to 1e-12, whether stepped daily or caught up after missed runs. Tests enforce it.
+11. Recorded live bars are immutable. A source that restates one gets a `bar_revisions`
+    row and a WARN; the original is what the strategies traded on and stays.
 
 ## How to extend
 
@@ -126,6 +133,11 @@ never be reused, so the `pypi` environment should require a reviewer.
   whether or not `exchange_calendars` is installed.
 * Panel arrays are read-only; pandas 3 copy-on-write means a strategy's write silently copies,
   pandas 2 raises. Either way the panel is safe.
+* Paper sessions refuse to open when strategy source or `EngineConfig` changed since
+  registration (`SessionLockError`). That is the feature, not a bug: retuning mid-run is
+  how people fool themselves. Start a new session.
+* `LiveStore._connect` leaves sqlite3's `isolation_level` at its default. Driving BEGIN by
+  hand breaks on `executescript`, which commits any pending transaction before running.
 * `tests/` is a package; import helpers as `from tests.conftest import make_panel`.
 * Windows: prefer `.venv\Scripts\python.exe -m pytest`; PowerShell blocks some header strings.
 
