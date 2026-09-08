@@ -384,11 +384,6 @@ class PanelView:
         )
         return frame.dropna(subset=["close"])
 
-    def tail(self, n: int) -> PanelView:
-        """A view of the last ``n`` bars (same end, shorter history)."""
-        start = max(0, self._end - n)
-        return PanelView(self._panel.slice(start, self._end), self._end - start)
-
 
 def _resolve_markets(
     market: str | Market | Mapping[str, str | Market] | None, symbols: Sequence[str]

@@ -10,7 +10,7 @@ Focus markets: US and India first, others as data quality allows.
 
 Python >= 3.11, numpy, pandas 2.2+/3.x, pyarrow, platformdirs. Optional: yfinance, requests
 (NSE), exchange_calendars. Dev: pytest, hypothesis, ruff, mypy. Build: hatchling.
-Venv: `.venv` (Python 3.12). `.venv_pypi` is a stale leftover, safe to delete.
+Venv: `.venv` (Python 3.12).
 
 ## Commands
 
@@ -138,6 +138,8 @@ never be reused, so the `pypi` environment should require a reviewer.
   how people fool themselves. Start a new session.
 * `LiveStore._connect` leaves sqlite3's `isolation_level` at its default. Driving BEGIN by
   hand breaks on `executescript`, which commits any pending transaction before running.
+* `tests/test_readme_examples.py` runs every code block in README.md. Change the README,
+  change that file. A failure there means the README is lying to somebody.
 * `tests/` is a package; import helpers as `from tests.conftest import make_panel`.
 * Windows: prefer `.venv\Scripts\python.exe -m pytest`; PowerShell blocks some header strings.
 

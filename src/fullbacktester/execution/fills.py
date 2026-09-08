@@ -20,7 +20,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import pandas as pd
 
 from fullbacktester.data.panel import Panel
 from fullbacktester.execution.config import EngineConfig
@@ -224,11 +223,3 @@ def _reference_price(
     if order.is_buy:
         return (max(open_, stop), "") if high >= stop else (None, "stop not triggered")
     return (min(open_, stop), "") if low <= stop else (None, "stop not triggered")
-
-
-def unfilled_summary(orders: list[Order]) -> pd.Series:
-    """Count of orders by final status, for reports."""
-    counts: dict[str, int] = {}
-    for order in orders:
-        counts[order.status.value] = counts.get(order.status.value, 0) + 1
-    return pd.Series(counts, dtype="int64")
