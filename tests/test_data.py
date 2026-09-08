@@ -169,8 +169,54 @@ def test_quality_checks_flag_jumps_gaps_zero_volume_and_stale(panel_factory):
     by_symbol = {(f.symbol, f.severity) for f in flags}
     assert ("S0", Severity.INFO) in by_symbol
     assert any(f.symbol == "S1" and "single-bar move" in f.message for f in flags)
-    assert any(f.symbol == "S2" and "missing" in f.message for f in flags)
+    assert any(f.symbol == "S2" and "no bar" in f.message for f in flags)
 
     stale_close = pd.DataFrame(np.full((40, 1), 50.0), index=clean.timestamps, columns=["Z"])
     stale = Panel.from_wide(stale_close, market=US)
     assert any("stale" in f.message for f in check_data_quality(stale))
+
+
+def test_unscheduled_sessions_do_not_mask_absent_ones(panel_factory):
+    """Regression: counting sessions let extra bars hide real gaps.
+
+    Found on a live 2018-2024 NSE pull. Six Diwali Muhurat sessions, which no
+    standard calendar lists, cancelled out three genuinely absent sessions, so
+    a panel with real holes reported clean.
+    """
+    from fullbacktester.data.panel import Panel
+
+    clean = panel_factory(n_bars=40)
+    bars = clean.to_bars()
+
+    # Drop three real sessions for one symbol.
+    dropped = sorted(bars.loc[bars["symbol"] == "S0", "timestamp"].unique())[10:13]
+    bars = bars[~((bars["symbol"] == "S0") & (bars["timestamp"].isin(dropped)))]
+
+    # Add three bars on days the calendar does not call sessions (a weekend).
+    saturdays = [pd.Timestamp("2023-01-07"), pd.Timestamp("2023-01-14"), pd.Timestamp("2023-01-21")]
+    extra = pd.DataFrame(
+        {
+            "timestamp": [US.session_close_utc(d) for d in saturdays],
+            "symbol": "S0",
+            "open": 100.0,
+            "high": 100.0,
+            "low": 100.0,
+            "close": 100.0,
+            "volume": 1000.0,
+        }
+    )
+    panel = Panel.from_bars(pd.concat([bars, extra], ignore_index=True), market=US)
+
+    flags = [f for f in check_data_quality(panel) if f.symbol == "S0"]
+    absent = [f for f in flags if "no bar" in f.message]
+    unscheduled = [f for f in flags if "does not list as sessions" in f.message]
+
+    # Counts cancel out exactly: 3 dropped, 3 added. Only set comparison sees both.
+    assert len(absent) == 1 and "3 session(s)" in absent[0].message
+    assert absent[0].severity is Severity.WARN if US.holiday_aware else Severity.INFO
+    assert len(unscheduled) == 1 and "3 bar(s)" in unscheduled[0].message
+    assert str(dropped[0].date()) in absent[0].message
+
+
+def test_clean_panel_reports_neither_absent_nor_unscheduled(panel_factory):
+    assert check_data_quality(panel_factory(n_bars=40)) == []

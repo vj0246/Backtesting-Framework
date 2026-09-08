@@ -8,6 +8,7 @@ caveats (survivorship, adjustment) are appended when the source is known.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -55,19 +56,39 @@ def check_data_quality(
         if market is not None and panel.frequency is Frequency.DAY_1 and n_valid > 1:
             first = valid_ts[0].tz_convert(market.tz).date()
             last = valid_ts[-1].tz_convert(market.tz).date()
-            expected = len(market.expected_sessions(first, last))
-            missing = expected - n_valid
-            if missing > 0:
-                severity = Severity.WARN if market.holiday_aware else Severity.INFO
-                basis = "holiday calendar" if market.holiday_aware else "weekday count"
+            # Compare the actual dates, not their counts. Subtracting counts lets an
+            # unscheduled session hide a genuinely absent one: NSE's Diwali Muhurat
+            # sessions are not in any standard calendar, and six of them masked three
+            # real gaps in a live 2018-2024 pull.
+            observed = {ts.tz_convert(market.tz).date() for ts in valid_ts}
+            scheduled = {d.date() for d in market.expected_sessions(first, last)}
+            absent = sorted(scheduled - observed)
+            unscheduled = sorted(observed - scheduled)
+            basis = "holiday calendar" if market.holiday_aware else "weekday count"
+
+            if absent:
+                hint = (
+                    ""
+                    if market.holiday_aware
+                    else "; install exchange_calendars for holiday-aware counts"
+                )
                 flags.append(
                     Flag(
                         SOURCE,
-                        severity,
-                        f"{missing} session(s) missing between {first} and {last} ({basis}; "
-                        "install exchange_calendars for holiday-aware counts)"
-                        if not market.holiday_aware
-                        else f"{missing} session(s) missing between {first} and {last} ({basis})",
+                        Severity.WARN if market.holiday_aware else Severity.INFO,
+                        f"{len(absent)} session(s) with no bar between {first} and {last} "
+                        f"({basis}{hint}): {_sample_dates(absent)}",
+                        symbol=symbol,
+                    )
+                )
+            if unscheduled:
+                flags.append(
+                    Flag(
+                        SOURCE,
+                        Severity.INFO,
+                        f"{len(unscheduled)} bar(s) on days the {basis} does not list as "
+                        f"sessions: {_sample_dates(unscheduled)}. Special sessions such as "
+                        "NSE Diwali Muhurat trading look like this and are genuine",
                         symbol=symbol,
                     )
                 )
@@ -130,3 +151,8 @@ def _longest_constant_run(values: np.ndarray) -> int:
         run = run + 1 if flag else 0
         longest = max(longest, run)
     return longest + 1 if longest else 1
+
+
+def _sample_dates(dates: list[date], limit: int = 4) -> str:
+    shown = ", ".join(str(d) for d in dates[:limit])
+    return shown if len(dates) <= limit else f"{shown}, and {len(dates) - limit} more"

@@ -389,3 +389,41 @@ directory. Nothing had been published to any index, so no compatibility shim is 
 no version was burned. The Limitations section stays exactly as written; it now does more
 work, because the name no longer does it.
 
+---
+
+## D-017: Session-gap detection compares dates, not counts
+
+**Date:** 2026-09-08
+
+**Context.** First run against real market data: fifteen NSE large caps, 2018-2024, pulled
+through yfinance. `check_data_quality` reported no session problems at all. It was wrong.
+
+**What real data exposed.** The check computed `missing = len(expected_sessions) - n_valid`.
+The panel held 1727 bars against 1724 calendar sessions, so the subtraction gave -3 and
+nothing was flagged. Comparing the date *sets* showed both a surplus and a deficit:
+
+* Six bars on days `exchange_calendars` does not list as sessions: 2018-11-07, 2019-10-27,
+  2020-11-14, 2021-11-04, 2022-10-24, 2024-11-01. These are NSE's annual Diwali Muhurat
+  session, a one-hour ceremonial auction that twice fell on a weekend. They are real data.
+* Three calendar sessions with no bar at all: 2019-02-13, 2019-03-29, 2024-01-20.
+
+The surplus cancelled the deficit. A panel can be missing an entire week and report clean
+so long as it carries a week of unexpected bars.
+
+**Positions.**
+- *A (keep counting, subtract):* one line, no allocation. Correct only when the data never
+  contains a session the calendar omits, which India violates every single year.
+- *B (compare date sets):* build both sets and difference them in each direction. Costs one
+  set per symbol, catches the masking case, and can name the offending dates.
+
+**Resolution.** B, reported as two distinct findings rather than one number. Absent sessions
+are a WARN, since data is genuinely missing. Unscheduled bars are an INFO naming Muhurat
+explicitly, since flagging a real exchange session as an error trains the reader to ignore
+the report. Both list the actual dates; "3 session(s) missing" is unactionable, while
+"2019-02-13, 2019-03-29, 2024-01-20" can be checked in a minute.
+
+**Consequences.** Ships in 0.1.1. The regression test reproduces the exact cancellation,
+three dropped sessions against three added weekend bars, which the old arithmetic could not
+see. Worth recording that no synthetic fixture would ever have found this: the bug needed a
+market whose real calendar disagrees with the reference calendar, which is precisely why the
+real-data run was worth doing before adding features.

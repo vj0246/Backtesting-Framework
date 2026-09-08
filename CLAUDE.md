@@ -112,6 +112,10 @@ never be reused, so the `pypi` environment should require a reviewer.
 * `Order.quantity` for target orders is NaN until filled; check `is_target`.
 * Turnover per bar can reach 2x equity (full rotation). Not a bug.
 * NSE bhavcopy prices are unadjusted. yfinance India tickers get `.NS` unless a suffix exists.
+* NSE runs a Diwali Muhurat session each year that no standard calendar lists, sometimes on a
+  weekend (2019-10-27 Sun, 2020-11-14 Sat). `check_data_quality` reports these as INFO
+  'unscheduled' bars, not as errors. It compares session *dates*, never counts: subtracting
+  counts let those six sessions mask three genuinely absent ones on a live 2018-2024 pull.
 * `exchange_calendars` has no `XNSE`; `INDIA.calendar_code` is `XBOM` (same holidays). Unknown
   codes degrade to weekday counting, never raise. NSE declares ad-hoc holidays the calendar
   may not know (2024-01-22 showed as "1 session missing" on a live pull); treat that WARN as
