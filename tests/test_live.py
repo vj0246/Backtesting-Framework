@@ -58,6 +58,17 @@ def _config():
     )
 
 
+def _fresh_interpreter():
+    """Reset the process-local order-id counter, as starting python again would.
+
+    Paper trading spans processes by design, so any test that claims to check
+    resumption has to reproduce this or it is checking nothing.
+    """
+    from fullbacktester.execution import orders as orders_module
+
+    orders_module._last_order_id = 0
+
+
 def _feed(panel, upto):
     """Bars up to and including index ``upto``, as a source would return them."""
     bars = panel.to_bars()
@@ -328,6 +339,7 @@ def test_state_survives_a_new_process(tmp_path, panel_factory):
         first.step(now=panel.timestamps[i] + pd.Timedelta(hours=1), bars=_feed(panel, i))
     del first
 
+    _fresh_interpreter()
     resumed = PaperSession.open(path, strategies={"mom": _strategy()}, config=_config())
     for i in range(20, len(panel)):
         resumed.step(now=panel.timestamps[i] + pd.Timedelta(hours=1), bars=_feed(panel, i))
@@ -460,3 +472,52 @@ def test_result_before_any_step_is_an_error(tmp_path, panel_factory):
     )
     with pytest.raises(ValueError, match="no recorded equity"):
         session.result("mom")
+
+
+def test_resuming_in_a_fresh_process_keeps_the_whole_blotter(tmp_path, panel_factory):
+    """Regression: order ids restart at 1 in a new interpreter.
+
+    They are the primary key in the orders table, so without reserving past the
+    ids already stored, the second run's orders overwrite the first run's. The
+    bug lost 18 of 58 orders and left the equity curve intact, so nothing else
+    would have noticed.
+    """
+    panel = panel_factory(n_bars=30, seed=17)
+    path = tmp_path / "s.db"
+
+    def always_in(view):
+        return {s: 1 / len(view.symbols) for s in view.symbols}
+
+    def strategies():
+        return {"hold": RuleBasedStrategy(always_in, warmup=1)}
+
+    PaperSession.create(
+        path,
+        name="t",
+        strategies=strategies(),
+        symbols=panel.symbols,
+        market=US,
+        config=_config(),
+    )
+
+    first = PaperSession.open(path, strategies=strategies(), config=_config())
+    for i in range(10):
+        first.step(now=panel.timestamps[i] + pd.Timedelta(hours=1), bars=_feed(panel, i))
+    placed_first = len(first.store.orders_frame("hold"))
+    assert placed_first > 0
+
+    _fresh_interpreter()
+    second = PaperSession.open(path, strategies=strategies(), config=_config())
+    placed_second = 0
+    for i in range(10, len(panel)):
+        report = second.step(now=panel.timestamps[i] + pd.Timedelta(hours=1), bars=_feed(panel, i))
+        placed_second += report.orders_placed["hold"]
+
+    blotter = second.store.orders_frame("hold")
+    assert len(blotter) == placed_first + placed_second
+    assert blotter["id"].is_unique
+
+    backtest = EventDrivenEngine(_config()).run(RuleBasedStrategy(always_in, warmup=1), panel)
+    np.testing.assert_allclose(
+        second.result("hold").equity.to_numpy(), backtest.equity.to_numpy(), rtol=1e-12
+    )

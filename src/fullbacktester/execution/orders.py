@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import StrEnum
-from itertools import count
 
 import pandas as pd
 
@@ -39,7 +38,29 @@ class OrderStatus(StrEnum):
     REJECTED = "rejected"
 
 
-_order_ids = count(1)
+_last_order_id = 0
+
+
+def _new_order_id() -> int:
+    return _reserve(1)
+
+
+def _reserve(count_: int) -> int:
+    global _last_order_id
+    _last_order_id += count_
+    return _last_order_id
+
+
+def reserve_order_ids(through: int) -> None:
+    """Guarantee that future order ids exceed ``through``.
+
+    Order ids come from a process-local counter, so a resumed paper-trading
+    session in a fresh interpreter would otherwise start again at 1 and collide
+    with ids already persisted, overwriting the earlier blotter. Sessions call
+    this with the highest id on record when they open.
+    """
+    global _last_order_id
+    _last_order_id = max(_last_order_id, through)
 
 
 @dataclass
@@ -62,7 +83,7 @@ class Order:
     created_at: pd.Timestamp | None = None
     created_bar: int = -1
     max_bars: int | None = None
-    id: int = field(default_factory=lambda: next(_order_ids))
+    id: int = field(default_factory=_new_order_id)
     status: OrderStatus = OrderStatus.PENDING
     filled_quantity: float = 0.0
     reason: str | None = None

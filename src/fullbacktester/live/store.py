@@ -410,6 +410,12 @@ class LiveStore:
             rows = db.execute(query + " ORDER BY order_id", params).fetchall()
         return [_row_to_order(row) for row in rows]
 
+    def max_order_id(self) -> int:
+        """Highest order id on record, across every strategy. 0 when empty."""
+        with self._connect() as db:
+            row = db.execute("SELECT MAX(order_id) AS top FROM orders").fetchone()
+        return 0 if row is None or row["top"] is None else int(row["top"])
+
     def equity_frame(self, strategy: str) -> pd.DataFrame:
         with self._connect() as db:
             rows = db.execute(

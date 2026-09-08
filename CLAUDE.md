@@ -136,6 +136,10 @@ never be reused, so the `pypi` environment should require a reviewer.
 * Paper sessions refuse to open when strategy source or `EngineConfig` changed since
   registration (`SessionLockError`). That is the feature, not a bug: retuning mid-run is
   how people fool themselves. Start a new session.
+* `Order.id` comes from a process-local counter, and it is the orders table's primary key.
+  `PaperSession` calls `reserve_order_ids(store.max_order_id())` on create and open; without
+  it a resumed session in a fresh interpreter restarts at 1 and overwrites its own blotter.
+  Tests that claim to check resumption must reset that counter or they check nothing.
 * `LiveStore._connect` leaves sqlite3's `isolation_level` at its default. Driving BEGIN by
   hand breaks on `executescript`, which commits any pending transaction before running.
 * `tests/test_readme_examples.py` runs every code block in README.md. Change the README,

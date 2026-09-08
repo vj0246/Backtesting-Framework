@@ -38,7 +38,12 @@ from fullbacktester.data.sources.base import DataSource
 from fullbacktester.execution.config import EngineConfig, FillTiming
 from fullbacktester.execution.fills import FillModel
 from fullbacktester.execution.ledger import Ledger
-from fullbacktester.execution.orders import Order, OrderStatus, OrderType
+from fullbacktester.execution.orders import (
+    Order,
+    OrderStatus,
+    OrderType,
+    reserve_order_ids,
+)
 from fullbacktester.flags import Flag, Severity
 from fullbacktester.live.store import LiveStore, SessionSpec, StrategyRecord
 from fullbacktester.markets import Frequency, Market, get_market
@@ -182,6 +187,7 @@ class PaperSession:
             for label, strategy in strategies.items()
         ]
         store.initialise(spec, records)
+        reserve_order_ids(store.max_order_id())
         return cls(
             store=store,
             spec=spec,
@@ -228,6 +234,9 @@ class PaperSession:
                     f"({registered[label].code_hash} -> {actual}). A paper record only means "
                     "something if the strategy held still; start a new session."
                 )
+        # Order ids come from a process-local counter. A fresh interpreter would
+        # restart it at 1 and overwrite the blotter this session already holds.
+        reserve_order_ids(store.max_order_id())
         return cls(
             store=store,
             spec=spec,
