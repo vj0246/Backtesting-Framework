@@ -1,6 +1,6 @@
 [project]
 name = "FullBacktester"
-version = "0.2.0"
+version = "0.3.0"
 description = "Backtesting engine with built-in defenses against look-ahead bias, survivorship bias, and overfitting: point-in-time data access, dual cross-checked engines, leakage scanners, and deflated performance statistics."
 readme = "README.md"
 license = "MIT"
@@ -29,6 +29,8 @@ dependencies = [
 [project.optional-dependencies]
 yfinance = ["yfinance>=0.2.40"]
 nse = ["requests>=2.31"]
+upstox = ["requests>=2.31"]
+alpaca = ["requests>=2.31"]
 calendars = ["exchange_calendars>=4.5"]
 all = ["yfinance>=0.2.40", "requests>=2.31", "exchange_calendars>=4.5"]
 dev = [

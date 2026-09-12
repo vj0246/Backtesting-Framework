@@ -59,6 +59,8 @@ you an edge in both. This one shows you the bill.
 pip install FullBacktester                 # core: numpy, pandas, pyarrow
 pip install "FullBacktester[yfinance]"     # Yahoo: US, India (.NS/.BO), crypto
 pip install "FullBacktester[nse]"          # NSE India official bhavcopy
+pip install "FullBacktester[upstox]"       # Upstox candles for India
+pip install "FullBacktester[alpaca]"       # Alpaca bars for the US
 pip install "FullBacktester[calendars]"    # holiday-aware sessions
 pip install "FullBacktester[all]"          # all of the above
 ```
@@ -243,13 +245,20 @@ panel = fbt.load_panel(symbols, start, end, market="US")
 panel = fbt.load_panel(["BTC-USD"], start, end, market="CRYPTO")
 panel = fbt.load_panel(symbols, start, end, market="US",
                        frequency=fbt.Frequency.HOUR_1)             # intraday
+panel = fbt.load_panel(symbols, start, end, market="IN", source="upstox")
 ```
 
-| Source | Markets | Adjusted | Survivorship-free |
-|---|---|---|---|
-| `yfinance` (default) | US, IN, CRYPTO | yes | **no** |
-| `nse` | IN, daily | **no** | **yes** |
-| `local` | any | you declare it | no |
+| Source | Markets | Account | Adjusted | Survivorship-free |
+|---|---|---|---|---|
+| `yfinance` (default) | US, IN, CRYPTO | none | yes, incl. dividends | **no** |
+| `upstox` | IN, from 2000 | none today | splits and bonuses, **not dividends** | no |
+| `alpaca` | US | free keys | yes, incl. dividends | no |
+| `nse` | IN, daily | none | **no** | **yes** |
+| `local` | any | none | you declare it | no |
+
+Every symbol you ask for must come back, so a misspelled ticker is an error rather
+than a silently missing column. Bars that have not closed yet are never returned,
+so a call made during market hours cannot hand you a half-formed bar.
 
 Everything is cached to Parquet keyed by source, market, frequency and symbol, so
 research is reproducible and the second run does not hit the network.
@@ -263,6 +272,44 @@ panel = fbt.load_panel(["AAPL"], start, end, market="US",
 
 Column names are matched case-insensitively; naive dates become the market's
 session close.
+
+**Broker feeds, with your own credentials.** Two sources talk to brokers directly.
+Each reads credentials from *your* environment on *your* machine; nothing is stored
+in the cache, the paper-trading database, or any log, and errors name the variable
+to set, never its value.
+
+```python
+panel = fbt.load_panel(["RELIANCE", "TCS"], "2015-01-01", "2024-12-31",
+                       market="IN", source="upstox")
+panel = fbt.load_panel(["AAPL", "BRK-B"], "2015-01-01", "2024-12-31",
+                       market="US", source="alpaca")
+```
+
+- **Upstox** (India) needs no account today: its historical candle API currently
+  answers without authentication, although its documentation says a token is
+  required. If you set `UPSTOX_ANALYTICS_TOKEN` it is sent with every request, so
+  nothing breaks if that changes. The Analytics Token is free, lasts a year, and is
+  read-only, so it cannot trade even if it leaks. Symbols are plain NSE tickers;
+  typos get a suggestion. Prices are adjusted for splits and bonuses but **not
+  dividends**: on 2024 data, Upstox closes sat 1.2% (RELIANCE) to 8.7% (TCS) above
+  Yahoo's dividend-adjusted ones, so for dividend-heavy names returns are
+  understated by a few percent a year. The report says so.
+- **Alpaca** (US) needs free API keys in `APCA_API_KEY_ID` and
+  `APCA_API_SECRET_KEY`, the names Alpaca's own SDKs use. Data is the consolidated
+  SIP feed, split and dividend adjusted. The free plan only serves data older than
+  15 minutes, which the source respects automatically.
+
+Setting a variable so scheduled jobs also see it:
+
+```powershell
+[Environment]::SetEnvironmentVariable("APCA_API_KEY_ID", "<your key>", "User")
+```
+
+```bash
+echo 'export APCA_API_KEY_ID=<your key>' >> ~/.bashrc
+```
+
+Never paste keys into code, notebooks, or chat, and never commit them.
 
 **Survivorship-free Indian universes** come from the exchange itself:
 
@@ -525,10 +572,10 @@ Read these before trusting a number.
 
 ```bash
 pip install -e ".[dev,all]"
-pytest                                    # 100 tests, incl. hypothesis property tests
+pytest                                    # includes hypothesis property tests
 ruff check src tests examples scripts
 mypy
-./scripts/clean_room_test.ps1             # build, then test the installed wheel
+python -m build && python -m twine check dist/*
 ```
 
 `scripts/verify_install.py` exercises the *installed* package with the source
@@ -537,10 +584,6 @@ the wheel, a lost `py.typed`, a stale `__all__` entry.
 
 Releasing is a GitHub Release tagged `v<version>`; the workflow publishes via PyPI
 Trusted Publishing and refuses if the tag and `pyproject.toml` disagree.
-
-`DECISIONS.md` records every architectural decision with the argument that was
-had, not just the outcome. Start there if you want to know why something is the
-way it is.
 
 ## License
 

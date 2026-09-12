@@ -18,9 +18,12 @@ from fullbacktester.data.panel import Panel, PanelView
 from fullbacktester.data.quality import check_data_quality
 from fullbacktester.data.schema import SchemaError, validate_bars
 from fullbacktester.data.sources import (
+    AlpacaSource,
+    CredentialError,
     DataSource,
     LocalSource,
     NSEBhavcopySource,
+    UpstoxSource,
     YFinanceSource,
     available_sources,
     get_source,
@@ -83,12 +86,13 @@ from fullbacktester.validation import (
     validate,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "CRYPTO",
     "INDIA",
     "US",
+    "AlpacaSource",
     "Arena",
     "ArenaResult",
     "BacktestResult",
@@ -98,6 +102,7 @@ __all__ = [
     "BpsCommission",
     "CSCVResult",
     "CostModel",
+    "CredentialError",
     "DataSource",
     "EngineComparison",
     "EngineConfig",
@@ -128,6 +133,7 @@ __all__ = [
     "StaticScanner",
     "Strategy",
     "TimeInForce",
+    "UpstoxSource",
     "ValidationReport",
     "VectorizedEngine",
     "VolumeShareSlippage",

@@ -1,16 +1,19 @@
 """Source registry with per-market defaults.
 
 Register a new source with ``register``; pick one by name with ``get_source``.
-Defaults favour adjusted prices (yfinance) because unadjusted prices produce
-wrong returns; the official NSE archive is registered as ``"nse"`` for
-survivorship-free universes and volume checks.
+Defaults need no account: yfinance, because its prices are adjusted. The official
+NSE archive is ``"nse"``. Broker feeds read the user's own credentials from the
+environment: ``"upstox"`` (India) and ``"alpaca"`` (US).
 """
 
 from __future__ import annotations
 
+from fullbacktester.data.sources._http import CredentialError
+from fullbacktester.data.sources.alpaca import AlpacaSource
 from fullbacktester.data.sources.base import DataSource
 from fullbacktester.data.sources.local import LocalSource
 from fullbacktester.data.sources.nse import NSEBhavcopySource
+from fullbacktester.data.sources.upstox import UpstoxSource
 from fullbacktester.data.sources.yfinance import YFinanceSource
 
 SOURCES: dict[str, type[DataSource]] = {}
@@ -26,7 +29,7 @@ def register(cls: type[DataSource]) -> type[DataSource]:
     return cls
 
 
-for _cls in (LocalSource, YFinanceSource, NSEBhavcopySource):
+for _cls in (LocalSource, YFinanceSource, NSEBhavcopySource, UpstoxSource, AlpacaSource):
     register(_cls)
 
 
@@ -52,9 +55,12 @@ def default_source_name(market_code: str) -> str:
 __all__ = [
     "DEFAULT_SOURCE_BY_MARKET",
     "SOURCES",
+    "AlpacaSource",
+    "CredentialError",
     "DataSource",
     "LocalSource",
     "NSEBhavcopySource",
+    "UpstoxSource",
     "YFinanceSource",
     "available_sources",
     "default_source_name",

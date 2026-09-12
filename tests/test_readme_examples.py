@@ -296,3 +296,27 @@ def test_metrics_reference_is_complete(india_panel, config):
         "probability_of_backtest_overfitting",
     ):
         assert hasattr(fbt.metrics, name), f"README documents fbt.metrics.{name}"
+
+
+def test_broker_feeds(tmp_path, monkeypatch):
+    """README: broker feeds. Offline: the HTTP layer is replaced, never the source."""
+    from fullbacktester.data.sources import alpaca as alpaca_module
+    from fullbacktester.data.sources import upstox as upstox_module
+    from tests.test_brokers import FakeSession, alpaca_route, upstox_route
+
+    # Keep the fake instrument master out of the user's real cache directory.
+    monkeypatch.setattr(upstox_module, "default_cache_root", lambda: tmp_path)
+    monkeypatch.setattr(upstox_module, "default_session", lambda extra: FakeSession(upstox_route))
+    monkeypatch.setattr(alpaca_module, "default_session", lambda extra: FakeSession(alpaca_route))
+    monkeypatch.delenv("UPSTOX_ANALYTICS_TOKEN", raising=False)
+    monkeypatch.setenv("APCA_API_KEY_ID", "readme-key")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "readme-secret")
+
+    india = fbt.load_panel(
+        ["RELIANCE", "TCS"], "2015-01-01", "2024-12-31", market="IN", source="upstox", cache=False
+    )
+    usa = fbt.load_panel(
+        ["AAPL", "BRK-B"], "2015-01-01", "2024-12-31", market="US", source="alpaca", cache=False
+    )
+    assert india.symbols == ("RELIANCE", "TCS")
+    assert usa.symbols == ("AAPL", "BRK-B")
