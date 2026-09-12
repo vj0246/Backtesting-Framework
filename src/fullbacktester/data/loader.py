@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -20,6 +20,10 @@ def resolve_source(source: str | DataSource | None, market: Market) -> DataSourc
     return get_source(source if source is not None else default_source_name(market.code))
 
 
+def _utc_now() -> pd.Timestamp:
+    return pd.Timestamp.now(tz="UTC")
+
+
 def load_bars(
     symbols: Sequence[str],
     start: date | str,
@@ -34,7 +38,8 @@ def load_bars(
 
     Cached symbols are served locally; the rest are fetched in one call to the
     source, validated, stored, and merged. ``cache=False`` bypasses storage
-    entirely (useful for tests and one-off pulls).
+    entirely (useful for tests and one-off pulls). Bars that have not closed yet
+    are dropped, so a call made during the session never returns a partial bar.
     """
     resolved_market = get_market(market)
     start_date, end_date = _as_date(start), _as_date(end)
@@ -74,16 +79,23 @@ def load_bars(
                         max(fetch_end, fetched[1]),
                     )
         fetched_bars = src.fetch(missing, fetch_start, fetch_end, frequency, resolved_market)
-        fetched_bars = (
-            validate_bars(fetched_bars)
-            if not fetched_bars.empty
-            else fetched_bars.reindex(columns=list(BAR_COLUMNS))
-        )
+        if fetched_bars.empty:
+            fetched_bars = fetched_bars.reindex(columns=list(BAR_COLUMNS))
+        else:
+            # A bar is final only once its close has passed. During the session sources
+            # return today's bar still forming; caching it, or recording it in a paper
+            # session, would freeze a partial bar as if it were complete.
+            now = _utc_now()
+            fetched_bars = validate_bars(fetched_bars)
+            fetched_bars = fetched_bars[fetched_bars["timestamp"] <= now]
+        # Only mark a day as covered once its session has closed, so it is refetched.
+        session_over = resolved_market.session_close_utc(fetch_end) <= _utc_now()
+        covered_end = fetch_end if session_over else fetch_end - timedelta(days=1)
         for symbol in missing:
             block = fetched_bars[fetched_bars["symbol"] == symbol]
-            if store is not None:
+            if store is not None and covered_end >= fetch_start:
                 key = CacheKey(src.name, resolved_market.code, frequency, symbol)
-                store.store(key, block, fetch_start, fetch_end)
+                store.store(key, block, fetch_start, covered_end)
             if not block.empty:
                 frames.append(block)
 
@@ -106,11 +118,24 @@ def load_panel(
     source: str | DataSource | None = None,
     cache: ParquetCache | bool = True,
 ) -> Panel:
-    """``load_bars`` then ``Panel.from_bars`` with the market and frequency attached."""
+    """``load_bars`` then ``Panel.from_bars`` with the market and frequency attached.
+
+    Every requested symbol must come back with at least one bar. A misspelled ticker
+    otherwise vanishes silently and the panel simply has one fewer column.
+    """
     bars = load_bars(
         symbols, start, end, market=market, frequency=frequency, source=source, cache=cache
     )
-    return Panel.from_bars(bars, frequency=frequency, market=get_market(market))
+    returned = set(bars["symbol"])
+    absent = [s for s in symbols if s not in returned]
+    if absent:
+        raise ValueError(
+            f"no bars for {absent} between {start} and {end}. Check the spelling, and whether "
+            "each symbol traded in that window (IPOs and delistings)."
+        )
+    return Panel.from_bars(
+        bars, frequency=frequency, market=get_market(market), symbols=list(symbols)
+    )
 
 
 def _as_date(value: date | str) -> date:

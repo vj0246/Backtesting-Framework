@@ -9,7 +9,7 @@ market is attached to the data rather than assumed by the engine.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 from functools import cache
 from typing import Any
@@ -110,6 +110,28 @@ class Market:
         day = pd.Timestamp(session).date()
         local = datetime.combine(day, self.session_open, tzinfo=self.zone)
         return pd.Timestamp(local).tz_convert("UTC")
+
+    def bar_close_utc(self, label: pd.Timestamp, frequency: Frequency) -> pd.Timestamp:
+        """UTC instant at which a bar labelled by the *start* of its interval is fully known.
+
+        Providers label bars by where they begin: Yahoo dates a weekly bar by its
+        Monday, Alpaca stamps a daily bar at midnight New York time. Read literally,
+        both make a bar look known days or hours before its last trade.
+
+        Daily: the session close of the label's local date. Weekly: the close of the
+        last scheduled session in the seven days from the label (holiday-aware with
+        ``exchange_calendars``, otherwise the weekday mask, which can only err late).
+        Intraday: label plus bar length. Every rule errs late rather than early.
+        """
+        stamp = pd.Timestamp(label)
+        local = stamp.tz_localize(self.tz) if stamp.tzinfo is None else stamp.tz_convert(self.tz)
+        if frequency.is_intraday:
+            return (local + frequency.timedelta).tz_convert("UTC")
+        day = local.date()
+        if frequency is Frequency.WEEK_1:
+            sessions = self.expected_sessions(day, day + timedelta(days=6))
+            return self.session_close_utc(sessions[-1] if len(sessions) else day)
+        return self.session_close_utc(day)
 
     def bars_per_year(self, frequency: Frequency) -> float:
         """Number of bars in a year at ``frequency``, for annualizing statistics."""

@@ -88,7 +88,8 @@ def check_data_quality(
                         Severity.INFO,
                         f"{len(unscheduled)} bar(s) on days the {basis} does not list as "
                         f"sessions: {_sample_dates(unscheduled)}. Special sessions such as "
-                        "NSE Diwali Muhurat trading look like this and are genuine",
+                        "NSE's Diwali Muhurat trading and its Saturday disaster-recovery "
+                        "drills look like this and are genuine",
                         symbol=symbol,
                     )
                 )

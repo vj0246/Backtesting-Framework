@@ -109,9 +109,5 @@ def _extract(raw: pd.DataFrame, ticker: str, *, single: bool) -> pd.DataFrame | 
 
 
 def _close_instants(index: pd.Index, frequency: Frequency, market: Market) -> pd.DatetimeIndex:
-    stamps = pd.DatetimeIndex(index)
-    if not frequency.is_intraday:
-        return pd.DatetimeIndex([market.session_close_utc(ts) for ts in stamps])
-    if stamps.tz is None:
-        stamps = stamps.tz_localize(market.tz)
-    return (stamps + frequency.timedelta).tz_convert("UTC")
+    # Yahoo labels bars by their start; a weekly bar is dated by its Monday.
+    return pd.DatetimeIndex([market.bar_close_utc(ts, frequency) for ts in pd.DatetimeIndex(index)])
