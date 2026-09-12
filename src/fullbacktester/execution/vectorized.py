@@ -4,8 +4,9 @@ Accepts ``WeightStrategy`` and ``BatchWeightStrategy`` only. Imperative
 strategies depend on fills and are refused with a ``TypeError`` rather than
 approximated.
 
-Accounting is a scan over bars with NumPy vectors over symbols (see
-DECISIONS.md D-007). Each step does exactly what the ledger does: mark to the
+Accounting is a scan over bars with NumPy vectors over symbols. A pure array
+formula cannot represent weight drift or split the overnight and intraday legs of
+a return, so each step does exactly what the ledger does: mark to the
 execution price, rebalance to target notional, pay costs from cash, mark to
 close. Under ``EngineConfig.idealized()`` this engine and the event-driven one
 agree to floating-point precision, which the test suite enforces.

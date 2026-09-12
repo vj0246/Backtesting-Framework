@@ -35,3 +35,9 @@ htmlcov/
 .DS_Store
 Thumbs.db
 *.log
+
+# Local-only project notes and personal tooling, kept out of the published repo
+CLAUDE.md
+DECISIONS.md
+.claudeignore
+scripts/clean_room_test.ps1
